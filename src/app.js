@@ -21,6 +21,16 @@ app.use(express.json());
 const authRouter = require("./routes/authRouter");
 app.use("/", authRouter);
 
+const facultyRouter = require("./routes/facultyRouter");
+app.use("/", facultyRouter);
+
+const departmentRouter = require("./routes/departmentRouter");
+app.use("/", departmentRouter);
+
+const leaveTypeRouter = require("./routes/leaveTypeRouter");
+app.use("/", leaveTypeRouter);
+
+
 const PORT = process.env.PORT || 2713;
 connectDB()
   .then(() => {
