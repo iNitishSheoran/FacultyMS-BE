@@ -30,6 +30,9 @@ app.use("/", departmentRouter);
 const leaveTypeRouter = require("./routes/leaveTypeRouter");
 app.use("/", leaveTypeRouter);
 
+const leaveRouter = require("./routes/leaveRouter");
+app.use("/", leaveRouter);
+
 
 const PORT = process.env.PORT || 2713;
 connectDB()
