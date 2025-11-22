@@ -110,7 +110,9 @@ leaveRouter.put("/leaves/:id/status", userAuth, isAdmin, async (req, res) => {
       return res.status(404).json({ success: false, message: "Leave not found" });
 
     leave.status = status;
+    leave.notificationShown = false; 
     await leave.save();
+
 
     res.status(200).json({ success: true, message: `Leave ${status} successfully`, leave });
   } catch (error) {
@@ -118,5 +120,36 @@ leaveRouter.put("/leaves/:id/status", userAuth, isAdmin, async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to update leave status" });
   }
 });
+
+// Mark notification as shown
+leaveRouter.put("/leaves/:id/mark-notified", userAuth, async (req, res) => {
+  try {
+    await Leave.findByIdAndUpdate(req.params.id, { notificationShown: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("❌ Mark Notification Error:", error);
+    res.status(500).json({ success: false, message: "Failed to mark notification" });
+  }
+});
+
+// Get pending notifications for the logged-in user
+leaveRouter.get("/leaves/notifications/pending", userAuth, async (req, res) => {
+  try {
+    const notifications = await Leave.find({
+      user: req.user._id,
+      notificationShown: false,
+      status: { $in: ["approved", "rejected"] }
+    })
+      .populate("leaveType", "name")
+      .sort({ updatedAt: -1 });
+
+    res.status(200).json({ success: true, notifications });
+  } catch (error) {
+    console.error("❌ Fetch Notifications Error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch notifications" });
+  }
+});
+
+
 
 module.exports = leaveRouter;
