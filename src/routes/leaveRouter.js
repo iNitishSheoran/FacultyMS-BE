@@ -97,6 +97,45 @@ leaveRouter.get("/leaves", userAuth, isAdmin, async (req, res) => {
   }
 });
 
+// ✅ Leave counts for logged-in faculty
+leaveRouter.get("/leaves/my/counts", userAuth, async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const total = await Leave.countDocuments({ user: userId });
+
+    const pending = await Leave.countDocuments({
+      user: userId,
+      status: "pending"
+    });
+
+    const approved = await Leave.countDocuments({
+      user: userId,
+      status: "approved"
+    });
+
+    const rejected = await Leave.countDocuments({
+      user: userId,
+      status: "rejected"
+    });
+
+    res.status(200).json({
+      success: true,
+      counts: {
+        total,
+        pending,
+        approved,
+        rejected
+      }
+    });
+
+  } catch (error) {
+    console.error("❌ Fetch Leave Counts Error:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch leave counts" });
+  }
+});
+
+
 // ✅ Approve / Reject leave (Admin)
 leaveRouter.put("/leaves/:id/status", userAuth, isAdmin, async (req, res) => {
   try {
