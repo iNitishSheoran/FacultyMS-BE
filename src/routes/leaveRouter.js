@@ -150,6 +150,41 @@ leaveRouter.get("/leaves/notifications/pending", userAuth, async (req, res) => {
   }
 });
 
+// Get remaining leaves for a user for a specific leave type
+leaveRouter.get("/leaves/remaining/:typeId", userAuth, async (req, res) => {
+  try {
+    const leaveTypeId = req.params.typeId;
+
+    const leaveType = await LeaveType.findById(leaveTypeId);
+    if (!leaveType)
+      return res.status(404).json({ success: false, message: "Leave type not found" });
+
+    // Fetch all leaves of this user for this type
+    const userLeaves = await Leave.find({
+      user: req.user._id,
+      leaveType: leaveTypeId,
+      status: { $in: ["approved", "pending"] }  // count only applied ones
+    });
+
+    // sum days
+    const usedDays = userLeaves.reduce((sum, leave) => sum + leave.totalDays, 0);
+
+    const remaining = leaveType.maxDays - usedDays;
+
+    res.json({
+      success: true,
+      maxDays: leaveType.maxDays,
+      usedDays,
+      remainingDays: remaining >= 0 ? remaining : 0,
+    });
+
+  } catch (err) {
+    console.error("Error getting remaining leaves:", err);
+    res.status(500).json({ success: false, message: "Failed to fetch remaining leaves" });
+  }
+});
+
+
 
 
 module.exports = leaveRouter;
