@@ -8,7 +8,7 @@ app.use(
   require("cors")({
     origin: [
       "http://localhost:5173", // dev frontend (vite)
-      "https://www.ictfaculty.live/"
+      "https://www.ictfaculty.live"
     ],
     credentials: true,
   })
