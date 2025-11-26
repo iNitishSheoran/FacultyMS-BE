@@ -2,7 +2,8 @@ const express = require("express");
 const facultyRouter = express.Router();
 const User = require("../models/user");
 const { userAuth } = require("../middlewares/auth.js");
-const {isAdmin} = require("../middlewares/isAdmin.js")
+const {isAdmin} = require("../middlewares/isAdmin.js");
+const fetch = require("node-fetch"); 
 
 // ✅ GET all faculty (with optional filters)
 facultyRouter.get("/faculties", userAuth, async (req, res) => {
@@ -68,6 +69,27 @@ facultyRouter.delete("/faculty/:id", userAuth, isAdmin, async (req, res) => {
       success: false,
       message: "Failed to delete faculty.",
     });
+  }
+});
+
+// ✅ GET faculty load from external site
+facultyRouter.get("/faculty-load", async (req, res) => {
+  const { school = "SOICT", dept = "" } = req.query;
+
+  try {
+    const url = `https://mygbu.in/schd/load.php?school=${school}&dept=${dept}`;
+
+    // Fetch HTML from external site
+    const response = await fetch(url, { timeout: 15000 }); // 15s timeout
+    if (!response.ok) {
+      return res.status(response.status).send("Failed to fetch external site");
+    }
+
+    const html = await response.text();
+    res.send(html); // send HTML to frontend
+  } catch (err) {
+    console.error("❌ Error fetching faculty load:", err);
+    res.status(500).send("Failed to fetch faculty load");
   }
 });
 
