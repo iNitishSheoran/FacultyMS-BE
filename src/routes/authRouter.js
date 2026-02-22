@@ -20,6 +20,10 @@ const getCookieOptions = () => {
   };
 };
 
+authRouter.get("/health-check", (req, res) => {
+  res.send("Backend Updated ✅");
+});
+
 // SIGNUP
 authRouter.post("/signup", async (req, res) => {
   try {
