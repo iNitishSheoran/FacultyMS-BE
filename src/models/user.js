@@ -42,16 +42,25 @@ const userSchema = new mongoose.Schema(
       },
     },
 
-    password: {
-      type: String,
-      required: true,
-      validate(value) {
-        if (!validator.isStrongPassword(value)) {
-          throw new Error("Password must be strong (mix of letters, numbers, symbols, min 8 chars)");
-        }
-      },
-    },
+password: {
+  type: String,
+  required: true,
+  validate(value) {
+    if (!validator.isStrongPassword(value)) {
+      throw new Error(
+        "Password must be strong (mix of letters, numbers, symbols, min 8 chars)"
+      );
+    }
+  },
+},
 
+resetToken: {
+  type: String,
+},
+
+resetTokenExpiry: {
+  type: Date,
+},
     age: {
       type: Number,
       required: [true, "Age is required"],

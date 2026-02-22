@@ -5,7 +5,9 @@ const User = require("../models/user");
 const bcrypt = require("bcrypt");
 const { userAuth } = require("../middlewares/auth.js");
 const { validateSignUpData } = require("../utils/validation.js"); // ✅ Import validation
-
+// imports (top pe)
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 // Cookie options helper (dev vs prod)
 const getCookieOptions = () => {
   const isProd = process.env.NODE_ENV === "production";
@@ -156,6 +158,89 @@ authRouter.post("/logout", (req, res) => {
   });
 
   res.json({ success: true, message: "Logout successful" });
+});
+
+// FORGOT PASSWORD
+authRouter.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.json({ message: "If email exists, reset link sent" });
+    }
+
+    const token = crypto.randomBytes(32).toString("hex");
+
+const hashedToken = crypto
+  .createHash("sha256")
+  .update(token)
+  .digest("hex");
+
+user.resetToken = hashedToken;
+    user.resetTokenExpiry = Date.now() + 15 * 60 * 1000;
+    await user.save();
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const resetLink = `http://localhost:3000/reset-password/${token}`;
+
+    await transporter.sendMail({
+      to: user.email,
+      from: process.env.EMAIL_USER,
+      subject: "Reset Your Password",
+      html: `
+        <h3>Password Reset</h3>
+        <p>Click below link to reset password (valid 15 min)</p>
+        <a href="${resetLink}">${resetLink}</a>
+      `,
+    });
+
+    res.json({ message: "Reset link sent to email" });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+authRouter.post("/reset-password/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const hashedToken = crypto
+  .createHash("sha256")
+  .update(token)
+  .digest("hex");
+
+const user = await User.findOne({
+  resetToken: hashedToken,
+      resetTokenExpiry: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired token" });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    user.password = hashedPassword;
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
+
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 module.exports = authRouter;
