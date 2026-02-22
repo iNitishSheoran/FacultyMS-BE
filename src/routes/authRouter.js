@@ -186,12 +186,15 @@ user.resetToken = hashedToken;
     await user.save();
 
     const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
+  host: "smtp.gmail.com",
+  port: 587,
+  secure: false, // TLS
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+  family: 4, // force IPv4 (THIS fixes Render issue)
+});
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
