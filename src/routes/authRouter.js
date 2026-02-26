@@ -3,6 +3,7 @@ const express = require("express");
 const authRouter = express.Router();
 const User = require("../models/user");
 const bcrypt = require("bcrypt");
+const dns = require("dns");
 const { userAuth } = require("../middlewares/auth.js");
 const { validateSignUpData } = require("../utils/validation.js"); // ✅ Import validation
 // imports (top pe)
@@ -185,7 +186,7 @@ user.resetToken = hashedToken;
     user.resetTokenExpiry = Date.now() + 15 * 60 * 1000;
     await user.save();
 
-    const transporter = nodemailer.createTransport({
+const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
   port: 587,
   secure: false, // TLS
@@ -193,7 +194,11 @@ user.resetToken = hashedToken;
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
-  family: 4, // force IPv4 (THIS fixes Render issue)
+  tls: { rejectUnauthorized: false }, // optional safety for self-signed certs
+  // ✅ Force IPv4 explicitly using Node's DNS lookup
+  lookup: (hostname, options, cb) => {
+    dns.lookup(hostname, { family: 4 }, cb);
+  },
 });
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
