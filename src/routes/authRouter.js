@@ -99,11 +99,16 @@ authRouter.post("/login", async (req, res) => {
     if (!isPasswordValid) throw new Error("Incorrect password");
 
     // Admin role check: BLOCK if trying to login as admin with non-admin email
-    if (role === "admin" && email !== process.env.ADMIN_EMAIL) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized as admin",
-      });
+    if (role === "admin") {
+      if (
+        email !== process.env.HOD_EMAIL &&
+        email !== process.env.DEAN_EMAIL
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not authorized as admin",
+        });
+      }
     }
 
     // Only now create JWT and set cookie
@@ -139,7 +144,9 @@ authRouter.get("/user", userAuth, async (req, res) => {
     const user = await User.findById(req.user._id).select("-password");
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    const isAdmin = user.email === process.env.ADMIN_EMAIL;
+    const isAdmin =
+      user.email === process.env.HOD_EMAIL ||
+      user.email === process.env.DEAN_EMAIL;
 
     res.json({
       success: true,
@@ -177,29 +184,29 @@ authRouter.post("/forgot-password", async (req, res) => {
 
     const token = crypto.randomBytes(32).toString("hex");
 
-const hashedToken = crypto
-  .createHash("sha256")
-  .update(token)
-  .digest("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
 
-user.resetToken = hashedToken;
+    user.resetToken = hashedToken;
     user.resetTokenExpiry = Date.now() + 15 * 60 * 1000;
     await user.save();
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false, // TLS
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  tls: { rejectUnauthorized: false }, // optional safety for self-signed certs
-  // ✅ Force IPv4 explicitly using Node's DNS lookup
-  lookup: (hostname, options, cb) => {
-    dns.lookup(hostname, { family: 4 }, cb);
-  },
-});
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false, // TLS
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+      tls: { rejectUnauthorized: false }, // optional safety for self-signed certs
+      // ✅ Force IPv4 explicitly using Node's DNS lookup
+      lookup: (hostname, options, cb) => {
+        dns.lookup(hostname, { family: 4 }, cb);
+      },
+    });
 
     const resetLink = `${process.env.FRONTEND_URL}/reset-password/${token}`;
 
@@ -227,12 +234,12 @@ authRouter.post("/reset-password/:token", async (req, res) => {
     const { password } = req.body;
 
     const hashedToken = crypto
-  .createHash("sha256")
-  .update(token)
-  .digest("hex");
+      .createHash("sha256")
+      .update(token)
+      .digest("hex");
 
-const user = await User.findOne({
-  resetToken: hashedToken,
+    const user = await User.findOne({
+      resetToken: hashedToken,
       resetTokenExpiry: { $gt: Date.now() },
     });
 

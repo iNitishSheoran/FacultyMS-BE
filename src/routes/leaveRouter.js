@@ -38,6 +38,10 @@ leaveRouter.post("/leaves/apply", userAuth, async (req, res) => {
       totalDays,
       reason,
       attachmentUrl,
+
+      status: "pending",
+      hodStatus: "pending",
+      deanStatus: "pending",
     });
 
     await newLeave.save();
@@ -85,7 +89,18 @@ leaveRouter.get("/leaves/my", userAuth, async (req, res) => {
 // ✅ View all leaves (Admin)
 leaveRouter.get("/leaves", userAuth, isAdmin, async (req, res) => {
   try {
-    const leaves = await Leave.find()
+    let query = {};
+
+    if (req.user.email === process.env.HOD_EMAIL) {
+      query = { hodStatus: "pending", status: "pending" };
+    } else if (req.user.email === process.env.DEAN_EMAIL) {
+      query = {
+        hodStatus: "approved",
+        deanStatus: "pending",
+        status: "pending",
+      };
+    }
+    const leaves = await Leave.find(query)
       .populate("user", "fullName email department")
       .populate("leaveType", "name")
       .sort({ createdAt: -1 });
@@ -139,24 +154,95 @@ leaveRouter.get("/leaves/my/counts", userAuth, async (req, res) => {
 // ✅ Approve / Reject leave (Admin)
 leaveRouter.put("/leaves/:id/status", userAuth, isAdmin, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status } = req.body; // approved / rejected
+    let userRole = "";
+
+    if (req.user.email === process.env.HOD_EMAIL) {
+      userRole = "hod";
+    } else if (req.user.email === process.env.DEAN_EMAIL) {
+      userRole = "dean";
+    } else {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
     if (!["approved", "rejected"].includes(status)) {
-      return res.status(400).json({ success: false, message: "Invalid status" });
+      return res.status(400).json({ message: "Invalid status" });
     }
 
     const leave = await Leave.findById(req.params.id);
-    if (!leave)
-      return res.status(404).json({ success: false, message: "Leave not found" });
+    if (!leave) {
+      return res.status(404).json({ message: "Leave not found" });
+    }
 
-    leave.status = status;
-    leave.notificationShown = false; 
+    // ❌ Already finalized
+    if (leave.status !== "pending") {
+      return res.status(400).json({ message: "Leave already finalized" });
+    }
+
+    // =====================
+    // 🧑‍🏫 HOD ACTION
+    // =====================
+    if (userRole === "hod") {
+
+      if (leave.hodStatus !== "pending") {
+        return res.status(400).json({ message: "Already reviewed by HOD" });
+      }
+
+      // ✅ ADD HERE 👇
+      leave.hodStatus = status;
+      leave.hodApprovedBy = req.user._id;
+      leave.hodApprovedAt = new Date();
+
+      // ❌ HOD rejects → FINAL
+      if (status === "rejected") {
+        leave.status = "rejected";
+        leave.notificationShown = false;
+      }
+
+      // ✅ HOD approves → wait for Dean
+      if (status === "approved") {
+        leave.deanStatus = "pending";
+      }
+    }
+
+    // =====================
+    // 🎓 DEAN ACTION
+    // =====================
+    else if (userRole === "dean") {
+
+      if (leave.hodStatus !== "approved") {
+        return res.status(400).json({ message: "HOD must approve first" });
+      }
+
+      if (leave.deanStatus !== "pending") {
+        return res.status(400).json({ message: "Already reviewed by Dean" });
+      }
+
+      // ✅ ADD HERE 👇
+      leave.deanStatus = status;
+      leave.deanApprovedBy = req.user._id;
+      leave.deanApprovedAt = new Date();
+
+      // ✅ Final decision
+      leave.status = status;
+      leave.notificationShown = false;
+    }
+
+    else {
+      return res.status(403).json({ message: "Not authorized" });
+    }
+
     await leave.save();
 
+    res.json({
+      success: true,
+      message: `Leave ${status} by ${userRole}`,
+      leave,
+    });
 
-    res.status(200).json({ success: true, message: `Leave ${status} successfully`, leave });
   } catch (error) {
-    console.error("❌ Update Leave Status Error:", error);
-    res.status(500).json({ success: false, message: "Failed to update leave status" });
+    console.error("❌ Multi-level approval error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 });
 

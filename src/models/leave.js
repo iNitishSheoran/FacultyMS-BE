@@ -39,10 +39,28 @@ const leaveSchema = new mongoose.Schema(
       enum: ["pending", "approved", "rejected"],
       default: "pending",
     },
+
+    hodStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
+
+    deanStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      default: "pending",
+    },
     notificationShown: {
       type: Boolean,
       default: true, // true → nothing to notify yet
     },
+
+    hodApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    deanApprovedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    hodApprovedAt: Date,
+    deanApprovedAt: Date,
 
   },
   { timestamps: true }

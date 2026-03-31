@@ -42,25 +42,25 @@ const userSchema = new mongoose.Schema(
       },
     },
 
-password: {
-  type: String,
-  required: true,
-  validate(value) {
-    if (!validator.isStrongPassword(value)) {
-      throw new Error(
-        "Password must be strong (mix of letters, numbers, symbols, min 8 chars)"
-      );
-    }
-  },
-},
+    password: {
+      type: String,
+      required: true,
+      validate(value) {
+        if (!validator.isStrongPassword(value)) {
+          throw new Error(
+            "Password must be strong (mix of letters, numbers, symbols, min 8 chars)"
+          );
+        }
+      },
+    },
 
-resetToken: {
-  type: String,
-},
+    resetToken: {
+      type: String,
+    },
 
-resetTokenExpiry: {
-  type: Date,
-},
+    resetTokenExpiry: {
+      type: Date,
+    },
     age: {
       type: Number,
       required: [true, "Age is required"],
@@ -84,6 +84,12 @@ resetTokenExpiry: {
         values: ["cse", "it", "ece"],
         message: "Department must be cse, it, or ece",
       },
+    },
+
+    role: {
+      type: String,
+      enum: ["faculty", "hod", "dean"],
+      default: "faculty",
     },
 
     subjects: {
