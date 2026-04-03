@@ -100,16 +100,15 @@ authRouter.post("/login", async (req, res) => {
 
     // Admin role check: BLOCK if trying to login as admin with non-admin email
     if (role === "admin") {
-      if (
-        email !== process.env.HOD_EMAIL &&
-        email !== process.env.DEAN_EMAIL
-      ) {
-        return res.status(403).json({
-          success: false,
-          message: "You are not authorized as admin",
-        });
-      }
-    }
+  const adminEmails = process.env.ADMIN_EMAILS.split(",");
+
+  if (!adminEmails.includes(email)) {
+    return res.status(403).json({
+      success: false,
+      message: "You are not authorized as admin",
+    });
+  }
+}
 
     // Only now create JWT and set cookie
     const token = user.getJWT();
