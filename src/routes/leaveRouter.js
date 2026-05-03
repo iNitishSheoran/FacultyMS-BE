@@ -91,15 +91,39 @@ leaveRouter.get("/leaves", userAuth, isAdmin, async (req, res) => {
   try {
     let query = {};
 
-    if (req.user.email === process.env.HOD_EMAIL) {
-      query = { hodStatus: "pending", status: "pending" };
-    } else if (req.user.email === process.env.DEAN_EMAIL) {
-      query = {
-        hodStatus: "approved",
-        deanStatus: "pending",
-        status: "pending",
-      };
-    }
+    if (req.user.role === "hod") {
+  query = {
+    hodStatus: "pending",
+    status: "pending",
+  };
+
+  //  Only show leaves of HOD's department
+  const leaves = await Leave.find(query)
+    .populate({
+      path: "user",
+      match: { department: req.user.department },
+      select: "fullName email department",
+    })
+    .populate("leaveType", "name")
+    .sort({ createdAt: -1 });
+
+  // remove null users (filtered out)
+  const filteredLeaves = leaves.filter(l => l.user !== null);
+
+  return res.status(200).json({
+    success: true,
+    count: filteredLeaves.length,
+    leaves: filteredLeaves,
+  });
+}
+else if (req.user.role === "dean") {
+  query = {
+    hodStatus: "approved",
+    deanStatus: "pending",
+    status: "pending",
+  };
+}
+
     const leaves = await Leave.find(query)
       .populate("user", "fullName email department")
       .populate("leaveType", "name")
@@ -157,19 +181,40 @@ leaveRouter.put("/leaves/:id/status", userAuth, isAdmin, async (req, res) => {
     const { status } = req.body; // approved / rejected
     let userRole = "";
 
-    if (req.user.email === process.env.HOD_EMAIL) {
-      userRole = "hod";
-    } else if (req.user.email === process.env.DEAN_EMAIL) {
-      userRole = "dean";
-    } else {
-      return res.status(403).json({ message: "Not authorized" });
-    }
+let leave;
+
+if (req.user.role === "hod") {
+  userRole = "hod";
+
+  leave = await Leave.findById(req.params.id).populate("user");
+
+  if (!leave) {
+    return res.status(404).json({ message: "Leave not found" });
+  }
+
+  if (leave.user.department !== req.user.department) {
+    return res.status(403).json({
+      message: "You can only review leaves of your department",
+    });
+  }
+}
+else if (req.user.role === "dean") {
+  userRole = "dean";
+
+  leave = await Leave.findById(req.params.id);
+  if (!leave) {
+    return res.status(404).json({ message: "Leave not found" });
+  }
+}
+else {
+  return res.status(403).json({ message: "Not authorized" });
+}
+
 
     if (!["approved", "rejected"].includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
     }
-
-    const leave = await Leave.findById(req.params.id);
+    
     if (!leave) {
       return res.status(404).json({ message: "Leave not found" });
     }

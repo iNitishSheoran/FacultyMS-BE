@@ -6,21 +6,16 @@ const isAdmin = (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { email } = req.user;
-
-    if (
-      email === process.env.HOD_EMAIL ||
-      email === process.env.DEAN_EMAIL
-    ) {
+    if (req.user.role === "hod" || req.user.role === "dean") {
       return next();
     }
 
     return res.status(403).json({ message: "Access Denied" });
 
   } catch (error) {
-    console.error("❌ isAdmin error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 module.exports = { isAdmin };

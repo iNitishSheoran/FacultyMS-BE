@@ -28,7 +28,6 @@ authRouter.get("/health-check", (req, res) => {
 // SIGNUP
 authRouter.post("/signup", async (req, res) => {
   try {
-    // ✅ Validate using validateSignUpData
     const { error } = validateSignUpData(req.body);
     if (error) {
       return res.status(400).json({ success: false, message: error.message });
@@ -46,12 +45,29 @@ authRouter.post("/signup", async (req, res) => {
       photoUrl,
     } = req.body;
 
-    // Hash password
+    const normalizedEmail = email.toLowerCase();
+
+    const hodEmails = process.env.HOD_EMAILS
+      ? process.env.HOD_EMAILS.split(",").map(e => e.trim().toLowerCase())
+      : [];
+
+    const deanEmails = process.env.DEAN_EMAILS
+      ? process.env.DEAN_EMAILS.split(",").map(e => e.trim().toLowerCase())
+      : [];
+
+    let role = "faculty";
+
+    if (deanEmails.includes(normalizedEmail)) {
+      role = "dean";
+    } else if (hodEmails.includes(normalizedEmail)) {
+      role = "hod";
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = new User({
       fullName,
-      email,
+      email: normalizedEmail,
       phoneNo,
       age,
       gender,
@@ -59,6 +75,7 @@ authRouter.post("/signup", async (req, res) => {
       subjects,
       password: passwordHash,
       photoUrl,
+      role,
     });
 
     const savedUser = await user.save();
@@ -79,38 +96,32 @@ authRouter.post("/signup", async (req, res) => {
         department: savedUser.department,
         subjects: savedUser.subjects,
         photoUrl: savedUser.photoUrl,
+        role: savedUser.role,
       },
     });
   } catch (err) {
     console.error("❌ Signup Error:", err);
-    res.status(400).json({ success: false, message: err.message || "Error signing up" });
+    res.status(400).json({
+      success: false,
+      message: err.message || "Error signing up",
+    });
   }
 });
+
 
 // LOGIN
 authRouter.post("/login", async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    const normalizedEmail = email.toLowerCase();
+
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) throw new Error("Invalid credentials");
 
     const isPasswordValid = await user.validatePassword(password);
     if (!isPasswordValid) throw new Error("Incorrect password");
 
-    // Admin role check: BLOCK if trying to login as admin with non-admin email
-    if (role === "admin") {
-  const adminEmails = process.env.ADMIN_EMAILS.split(",");
-
-  if (!adminEmails.includes(email)) {
-    return res.status(403).json({
-      success: false,
-      message: "You are not authorized as admin",
-    });
-  }
-}
-
-    // Only now create JWT and set cookie
     const token = user.getJWT();
     res.cookie("token", token, getCookieOptions());
 
@@ -127,11 +138,15 @@ authRouter.post("/login", async (req, res) => {
         department: user.department,
         subjects: user.subjects,
         photoUrl: user.photoUrl,
+        role: user.role,
       },
     });
   } catch (err) {
     console.error("❌ Login Error:", err);
-    res.status(err.status || 400).json({ success: false, message: err.message || "Error logging in" });
+    res.status(400).json({
+      success: false,
+      message: err.message || "Error logging in",
+    });
   }
 });
 
@@ -143,9 +158,7 @@ authRouter.get("/user", userAuth, async (req, res) => {
     const user = await User.findById(req.user._id).select("-password");
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    const isAdmin =
-      user.email === process.env.HOD_EMAIL ||
-      user.email === process.env.DEAN_EMAIL;
+    const isAdmin = user.role === "hod" || user.role === "dean";
 
     res.json({
       success: true,
